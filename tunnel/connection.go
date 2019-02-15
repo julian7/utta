@@ -11,7 +11,7 @@ import (
 )
 
 type connectionConfig struct {
-	config  *configuration
+	config  *Configuration
 	dial    dialer.Dialer
 	connect connector.Connector
 	sshtun  connector.Connector

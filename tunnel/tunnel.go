@@ -15,7 +15,7 @@ import (
 )
 
 // Tunnel sets up the tunnel based on configuration settings
-func (config *configuration) Tunnel() error {
+func (config *Configuration) Tunnel() error {
 	conf, err := config.configureTunnel()
 	if err != nil {
 		log.Fatalf("cannot configure tunnel: %v", err)
@@ -66,7 +66,7 @@ func tlsListener(l net.Listener, cert, key, ca string) (net.Listener, error) {
 	return tls.NewListener(l, config), nil
 }
 
-func (config *configuration) configureTunnel() (*connectionConfig, error) {
+func (config *Configuration) configureTunnel() (*connectionConfig, error) {
 	var err error
 	conf := &connectionConfig{config: config}
 

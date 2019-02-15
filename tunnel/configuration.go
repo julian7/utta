@@ -5,7 +5,8 @@ import (
 	"flag"
 )
 
-type configuration struct {
+// Configuration contains all tunables for the tunnel
+type Configuration struct {
 	listenAddr  string
 	listenCert  string
 	listenKey   string
@@ -21,8 +22,9 @@ type configuration struct {
 	sshKey      string
 }
 
-func GetConfiguration() (*configuration, error) {
-	conf := &configuration{}
+// GetConfiguration takes flags, and creates a configuration struct out of it.
+func GetConfiguration() (*Configuration, error) {
+	conf := &Configuration{}
 	flag.StringVar(&conf.listenAddr, "listen", ":8080", "Listen port")
 	flag.StringVar(&conf.listenCert, "lcert", "", "TLS certificate bundle for listening port (optional)")
 	flag.StringVar(&conf.listenKey, "lkey", "", "TLS key for listening port (optional, default to -lcert)")
