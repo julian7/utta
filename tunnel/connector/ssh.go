@@ -8,15 +8,20 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-type sshConnector struct {
-	connect string
-	tunnel  string
-	client  *ssh.Client
-	config  *ssh.ClientConfig
+// SSHConnector is a Connector, which can connect using SSH through the original Connection
+type SSHConnector struct {
+	// Connect is the original connection
+	Connect net.Conn
+	// Addr is hostname:port of the SSH endpoint
+	Addr string
+	// Tunnel is hostname:port to be accessed through SSH
+	Tunnel string
+	client *ssh.Client
+	config *ssh.ClientConfig
 }
 
 // NewSSHConnector sets up a new sshDialer for transmitting data through SSH tunnel
-func NewSSHConnector(tunnel, user, key string) (Connector, error) {
+func NewSSHConnector(addr, tunnel, user, key string) (*SSHConnector, error) {
 	privkey, err := ioutil.ReadFile(key)
 	if err != nil {
 		return nil, errors.Wrap(err, "cannot read SSH private key")
@@ -32,14 +37,15 @@ func NewSSHConnector(tunnel, user, key string) (Connector, error) {
 			return nil
 		},
 	}
-	return &sshConnector{tunnel: tunnel, config: config}, nil
+	return &SSHConnector{Addr: addr, Tunnel: tunnel, config: config}, nil
 }
 
-func (c *sshConnector) Setup(conn net.Conn) (net.Conn, error) {
-	cconn, chans, reqs, err := ssh.NewClientConn(conn, c.connect, c.config)
+// Setup sets up the original net.Conn to connect through SSH
+func (c *SSHConnector) Setup(conn net.Conn) (net.Conn, error) {
+	cconn, chans, reqs, err := ssh.NewClientConn(conn, c.Addr, c.config)
 	if err != nil {
 		return nil, err
 	}
 	client := ssh.NewClient(cconn, chans, reqs)
-	return client.Dial("tcp", c.tunnel)
+	return client.Dial("tcp", c.Tunnel)
 }

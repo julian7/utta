@@ -14,7 +14,7 @@ type connectionConfig struct {
 	config  *Configuration
 	dial    dialer.Dialer
 	connect connector.Connector
-	sshtun  connector.Connector
+	sshtun  *connector.SSHConnector
 }
 
 func (conf *connectionConfig) handleConn(downstream net.Conn) {
@@ -35,21 +35,20 @@ func (conf *connectionConfig) handleConn(downstream net.Conn) {
 		return
 	}
 	done := make(chan bool)
-	rawstream := upstream
 	if conf.sshtun != nil {
-		upstream, err = conf.sshtun.Setup(rawstream)
+		upstream, err = conf.sshtun.Setup(upstream)
 		if err != nil {
 			log.Printf("cannot build SSH: %v", err)
 			return
 		}
-		log.Printf("Built up SSH connection to %s", upstream.RemoteAddr())
+		log.Printf("Built up SSH connection to %s through %s", conf.sshtun.Tunnel, conf.sshtun.Addr)
 		go func(stream net.Conn, done <-chan bool) {
 			select {
 			case <-done:
 				stream.Close()
 				return
 			}
-		}(rawstream, done)
+		}(conf.sshtun.Connect, done)
 	}
 	go datapipe(downstream, upstream, "received", done)
 	go datapipe(upstream, downstream, "transmitted", done)

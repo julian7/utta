@@ -80,7 +80,7 @@ func (config *Configuration) configureTunnel() (*connectionConfig, error) {
 	}
 
 	if len(config.sshTunnel) > 0 {
-		conf.sshtun, err = connector.NewSSHConnector(config.sshTunnel, config.sshUser, config.sshKey)
+		conf.sshtun, err = connector.NewSSHConnector(config.connectAddr, config.sshTunnel, config.sshUser, config.sshKey)
 	}
 
 	conf.dial = dialer.NewDialer(5*time.Second, config.proxy, config.connectAddr)
