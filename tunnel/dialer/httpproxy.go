@@ -39,7 +39,7 @@ func (d *ProxyDialer) Dial() (net.Conn, error) {
 	}
 
 	if !strings.HasPrefix(string(readbuf), "HTTP/1.1 200 ") {
-		return nil, errors.Wrapf(err, "unknown proxy answer: %s", string(readbuf))
+		return nil, errors.Errorf("unknown proxy answer: %s", string(readbuf))
 	}
-	return conn, err
+	return conn, nil
 }
