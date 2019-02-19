@@ -2,7 +2,6 @@ package dialer
 
 import (
 	"fmt"
-	"log"
 	"net"
 	"strings"
 	"time"
@@ -10,18 +9,21 @@ import (
 	"github.com/pkg/errors"
 )
 
-type proxyDialer struct {
+// ProxyDialer is a Dialer implementation, to send packets through HTTP proxy
+type ProxyDialer struct {
 	timeout time.Duration
 	proxy   string
 	connect string
 }
 
-func NewProxyDialer(timeout time.Duration, proxy, connect string) *proxyDialer {
-	dialer := &proxyDialer{timeout: timeout, proxy: proxy, connect: connect}
-	return dialer
+// NewProxyDialer sets up a new ProxyDialer
+func NewProxyDialer(timeout time.Duration, proxy, connect string) *ProxyDialer {
+	return &ProxyDialer{timeout: timeout, proxy: proxy, connect: connect}
 }
 
-func (d *proxyDialer) Dial() (net.Conn, error) {
+// Dial connects to HTTP proxy, and requests remote connection using
+// CONNECT method to the final destination. Returns net.Conn on success, error on error.
+func (d *ProxyDialer) Dial() (net.Conn, error) {
 	conn, err := net.DialTimeout("tcp", d.proxy, d.timeout)
 	if err != nil {
 		return nil, errors.Wrap(err, "cannot dial proxy")
@@ -31,7 +33,7 @@ func (d *proxyDialer) Dial() (net.Conn, error) {
 		return nil, errors.Wrap(err, "cannot send CONNECT")
 	}
 	readbuf := make([]byte, 256)
-	n, err := conn.Read(readbuf)
+	_, err = conn.Read(readbuf)
 	if err != nil {
 		return nil, errors.Wrap(err, "cannot read from proxy")
 	}
@@ -39,6 +41,5 @@ func (d *proxyDialer) Dial() (net.Conn, error) {
 	if !strings.HasPrefix(string(readbuf), "HTTP/1.1 200 ") {
 		return nil, errors.Wrapf(err, "unknown proxy answer: %s", string(readbuf))
 	}
-	log.Printf("Read %d bytes: %s", n, string(readbuf))
 	return conn, err
 }
