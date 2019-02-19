@@ -16,11 +16,15 @@ type TLSConnector struct {
 
 // NewTLSConnector returns a Connector, which can be used for TLS connections.
 func NewTLSConnector(servername, cert, key string) (Connector, error) {
-	certbundle, err := tls.LoadX509KeyPair(cert, key)
-	if err != nil {
-		return nil, errors.Wrap(err, "cannot load client keypair")
+	conn := &TLSConnector{servername: servername}
+	if cert != "" {
+		certbundle, err := tls.LoadX509KeyPair(cert, key)
+		if err != nil {
+			return nil, errors.Wrap(err, "cannot load client keypair")
+		}
+		conn.cert = certbundle
 	}
-	return &TLSConnector{servername: servername, cert: certbundle}, nil
+	return conn, nil
 }
 
 // Setup takes a net.Conn, and implements a simple, non-checking TLS
