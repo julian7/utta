@@ -45,7 +45,9 @@ func (conf *connectionConfig) handleConn(downstream net.Conn) {
 		go func(stream net.Conn, done <-chan bool) {
 			select {
 			case <-done:
-				stream.Close()
+				if stream != nil {
+					stream.Close()
+				}
 				return
 			}
 		}(conf.sshtun.Connect, done)
