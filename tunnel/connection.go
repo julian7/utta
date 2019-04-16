@@ -5,9 +5,11 @@ import (
 	"io"
 	"log"
 	"net"
+	"strings"
 
 	"github.com/julian7/utta/tunnel/connector"
 	"github.com/julian7/utta/tunnel/dialer"
+	"github.com/pkg/errors"
 )
 
 type connectionConfig struct {
@@ -61,7 +63,13 @@ func datapipe(dst io.WriteCloser, src io.ReadCloser, direction string, done chan
 	var errstr string
 	b, err := io.Copy(io.Writer(dst), io.Reader(src))
 	if err != nil {
-		errstr = fmt.Sprintf(" Error: %v", err)
+		errOrig := errors.Cause(err)
+		if strings.Contains(errOrig.Error(), "use of closed network connection") {
+			err = nil
+		}
+	}
+	if err != nil {
+		errstr = fmt.Sprintf(" Error: %v vs %v", err, io.EOF)
 	}
 	log.Printf("%d bytes %s.%s", b, direction, errstr)
 	done <- true
