@@ -25,11 +25,13 @@ func (config *Configuration) Tunnel() error {
 	if err != nil {
 		log.Fatalf("cannot listen on port: %v", err)
 	}
+	log.Printf("Tunnel listening on %s", config.listenAddr)
 	if len(config.listenCert) > 0 {
 		ln, err = tlsListener(ln, config.listenCert, config.listenKey, config.listenCA)
 		if err != nil {
 			log.Fatalf("cannot set up TLS on listening channel: %v", err)
 		}
+		log.Printf("TLS set up on listening channel")
 	}
 
 	defer ln.Close()
