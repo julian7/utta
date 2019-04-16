@@ -27,6 +27,9 @@ func (config *Configuration) Tunnel() error {
 	}
 	if len(config.listenCert) > 0 {
 		ln, err = tlsListener(ln, config.listenCert, config.listenKey, config.listenCA)
+		if err != nil {
+			log.Fatalf("cannot set up TLS on listening channel: %v", err)
+		}
 	}
 
 	defer ln.Close()
@@ -81,6 +84,10 @@ func (config *Configuration) configureTunnel() (*connectionConfig, error) {
 
 	if len(config.sshTunnel) > 0 {
 		conf.sshtun, err = connector.NewSSHConnector(config.connectAddr, config.sshTunnel, config.sshUser, config.sshKey)
+		if err != nil {
+			return nil, errors.Wrap(err, "cannot set up SSH tunnel")
+		}
+		log.Printf("Setting up SSH tunnel to %s as %s using %s key", config.sshTunnel, config.sshUser, config.sshKey)
 	}
 
 	conf.dial = dialer.NewDialer(5*time.Second, config.proxy, config.connectAddr)
