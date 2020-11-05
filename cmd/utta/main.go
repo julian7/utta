@@ -1,19 +1,21 @@
 package main
 
 import (
-	"log"
+	"os"
 
-	"github.com/julian7/utta/tunnel"
+	"github.com/go-kit/kit/log"
 )
 
 func main() {
-	config, err := tunnel.GetConfiguration()
-	if err != nil {
-		log.Fatal(err)
-	}
+	logger := log.With(
+		log.NewLogfmtLogger(os.Stderr),
+		"ts",
+		log.DefaultTimestampUTC,
+	)
 
-	err = config.Tunnel()
-	if err != nil {
-		log.Fatal(err)
+	app := NewApp(logger)
+	if err := app.Command().Run(os.Args); err != nil {
+		_ = app.Log("error", err)
+		os.Exit(1)
 	}
 }

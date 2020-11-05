@@ -3,86 +3,151 @@ package tunnel
 import (
 	"fmt"
 	"io"
-	"log"
 	"net"
-	"os"
 	"strings"
+	"time"
 
+	"github.com/go-kit/kit/log"
 	"github.com/julian7/utta/tunnel/connector"
 	"github.com/julian7/utta/tunnel/dialer"
 	"github.com/julian7/utta/uuid"
 	"github.com/pkg/errors"
 )
 
-type connectionConfig struct {
-	config  *Configuration
+type Connection struct {
+	log.Logger
 	dial    dialer.Dialer
 	connect connector.Connector
 	sshtun  *connector.SSHConnector
 }
 
-func (conf *connectionConfig) handleConn(downstream net.Conn) {
+func NewConnection(logger log.Logger, addr, proxy string) *Connection {
+	return &Connection{
+		Logger: logger,
+		dial:   dialer.NewDialer(5*time.Second, proxy, addr),
+	}
+}
+
+func (cnx *Connection) SetupTCPConnector() error {
+	conn, err := connector.NewTCPConnector()
+	if err != nil {
+		return err
+	}
+
+	cnx.connect = conn
+
+	return nil
+}
+
+func (cnx *Connection) SetupTLSConnector(serverName, certFile, keyFile string) error {
+	connect, err := connector.NewTLSConnector(serverName, certFile, keyFile)
+	if err != nil {
+		return err
+	}
+
+	cnx.connect = connect
+
+	return nil
+}
+
+func (cnx *Connection) SetupSSHConnector(addr, tunnel, user, keyFile string) error {
+	sshtun, err := connector.NewSSHConnector(addr, tunnel, user, keyFile)
+	if err != nil {
+		return err
+	}
+
+	cnx.sshtun = sshtun
+
+	return nil
+}
+
+func (cnx *Connection) HasSSH() bool {
+	return cnx.sshtun != nil
+}
+
+func (cnx *Connection) ListenSSH(addr string) (net.Listener, error) {
+	return cnx.sshtun.Client.Listen("tcp", addr)
+}
+
+func (cnx *Connection) handleConn(downstream net.Conn) {
 	defer downstream.Close()
 
 	uuID, err := uuid.New()
-	sessionID := fmt.Sprintf("[%s] ", uuID.String())
 	if err != nil {
-		log.Printf(
-			"Error: cannot generate UUID for connection %s: %v",
-			downstream.RemoteAddr().String(),
-			err,
+		cnx.Logger.Log(
+			"level", "error",
+			"msg", "cannot generate UUID for connection",
+			"connection", downstream.RemoteAddr().String(),
+			"err", err,
 		)
 		return
 	}
-	connlog := log.New(os.Stdout, sessionID, log.LstdFlags)
 
-	connlog.Printf(
-		"Handling connection from %s", downstream.RemoteAddr().String(),
+	connlog := log.With(cnx.Logger, "session", uuID.String())
+
+	connlog.Log(
+		"msg", "Handling connection",
+		"remote", downstream.RemoteAddr().String(),
 	)
 
-	upstream, err := conf.dial.Dial()
+	upstream, err := cnx.Dial()
+
 	if err != nil {
-		connlog.Printf("dial failed: %v", err)
+		_ = connlog.Log("level", "error", "msg", "dial error", "err", err)
+
 		return
 	}
 
 	defer upstream.Close()
-	connlog.Printf("Connected to %s", upstream.RemoteAddr())
 
-	upstream, err = conf.connect.Setup(upstream)
-	if err != nil {
-		connlog.Printf("cannot set up TLS: %v", err)
-		return
-	}
+	connlog.Log("msg", "connection established", "addr", upstream.RemoteAddr())
+
 	done := make(chan bool)
-	if conf.sshtun != nil {
-		upstream, err = conf.sshtun.Setup(upstream)
-		if err != nil {
-			connlog.Printf("cannot build SSH: %v", err)
-			return
-		}
-		connlog.Printf(
-			"Built up SSH connection to %s through %s",
-			conf.sshtun.Tunnel,
-			conf.sshtun.Addr,
+	if cnx.sshtun != nil {
+		connlog.Log(
+			"msg", "SSH connection established",
+			"addr", cnx.sshtun.Tunnel,
+			"through", cnx.sshtun.Addr,
 		)
+
 		go func(stream net.Conn, done <-chan bool) {
-			select {
-			case <-done:
-				if stream != nil {
-					stream.Close()
-					connlog.Println("SSH connection closed")
-				}
-				return
+			<-done
+			if stream != nil {
+				stream.Close()
+				connlog.Log("msg", "SSH connection closed")
 			}
-		}(conf.sshtun.Connect, done)
+		}(cnx.sshtun.Connect, done)
 	}
+
 	go datapipe(connlog, downstream, upstream, "received", done)
 	go datapipe(connlog, upstream, downstream, "transmitted", done)
 	<-done
 }
 
-func datapipe(logger *log.Logger, dst io.WriteCloser, src io.ReadCloser, direction string, done chan bool) {
+func (cnx *Connection) Dial() (net.Conn, error) {
+	upstream, err := cnx.dial.Dial()
+	if err != nil {
+		return nil, fmt.Errorf("dialing to remote: %w", err)
+	}
+
+	if cnx.connect == nil {
+		return nil, errors.New("no connector provided for dial")
+	}
+	upstream, err = cnx.connect.Setup(upstream)
+	if err != nil {
+		return nil, fmt.Errorf("setting up TLS: %w", err)
+	}
+	if cnx.sshtun != nil {
+		upstream, err = cnx.sshtun.Setup(upstream)
+		if err != nil {
+			return nil, fmt.Errorf("setting up SSH connection: %w", err)
+		}
+	}
+
+	return upstream, nil
+}
+
+func datapipe(logger log.Logger, dst io.WriteCloser, src io.ReadCloser, direction string, done chan bool) {
 	var errstr string
 
 	b, err := io.Copy(io.Writer(dst), io.Reader(src))
@@ -95,6 +160,10 @@ func datapipe(logger *log.Logger, dst io.WriteCloser, src io.ReadCloser, directi
 	if err != nil {
 		errstr = fmt.Sprintf(" Error: %v vs %v", err, io.EOF)
 	}
-	logger.Printf("%d bytes %s.%s", b, direction, errstr)
+	logger.Log(
+		"msg", "connection summary",
+		direction, b,
+		"err", errstr,
+	)
 	done <- true
 }

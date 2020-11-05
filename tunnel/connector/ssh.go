@@ -16,7 +16,7 @@ type SSHConnector struct {
 	Addr string
 	// Tunnel is hostname:port to be accessed through SSH
 	Tunnel string
-	client *ssh.Client
+	Client *ssh.Client
 	config *ssh.ClientConfig
 }
 
@@ -46,6 +46,11 @@ func (c *SSHConnector) Setup(conn net.Conn) (net.Conn, error) {
 	if err != nil {
 		return nil, err
 	}
-	client := ssh.NewClient(cconn, chans, reqs)
-	return client.Dial("tcp", c.Tunnel)
+	c.Client = ssh.NewClient(cconn, chans, reqs)
+
+	if c.Tunnel != "" {
+		return c.Client.Dial("tcp", c.Tunnel)
+	}
+
+	return conn, nil
 }
