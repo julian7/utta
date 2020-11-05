@@ -86,3 +86,16 @@ func (a *App) remoteAction(c *cli.Context) error {
 		}
 	}
 }
+
+func (a *App) remoteBefore(c *cli.Context) error {
+	if c.String("connect") == "" {
+		return errors.New("--connect is required")
+	}
+	if c.String("sshuser") == "" {
+		return errors.New("--sshuser not provided")
+	}
+	if c.String("sshkey") == "" {
+		return errors.New("--sshkey not provided")
+	}
+	return nil
+}

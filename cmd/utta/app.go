@@ -27,11 +27,10 @@ func (a *App) Command() *cli.App {
 		},
 		Flags: []cli.Flag{
 			&cli.StringFlag{
-				Name:     "connect",
-				Value:    "",
-				Usage:    "Connect port",
-				Required: true,
-				EnvVars:  []string{"UTTA_CONNECT"},
+				Name:    "connect",
+				Value:   "",
+				Usage:   "Connect port",
+				EnvVars: []string{"UTTA_CONNECT"},
 			},
 			&cli.StringFlag{
 				Name:      "ccert",

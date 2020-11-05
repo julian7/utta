@@ -69,6 +69,9 @@ func (a *App) localAction(c *cli.Context) error {
 }
 
 func (a *App) localBefore(c *cli.Context) error {
+	if c.String("connect") == "" {
+		return errors.New("--connect is required")
+	}
 	if c.String("sshtunnel") != "" {
 		if c.String("sshuser") == "" {
 			return errors.New("--sshuser not provided")
