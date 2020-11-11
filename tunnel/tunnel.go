@@ -1,6 +1,7 @@
 package tunnel
 
 import (
+	"io"
 	"math/rand"
 	"time"
 
@@ -34,9 +35,15 @@ func (t *Tunnel) Run(cnx *Connection) error {
 	for {
 		conn, err := ln.Accept()
 		if err != nil {
+			if err == io.EOF {
+				_ = t.Log("level", "warn", "msg", "connection closed")
+				break
+			}
 			_ = t.Log("level", "error", "msg", "error in listen", "err", err)
 			continue
 		}
 		go cnx.handleConn(conn)
 	}
+
+	return nil
 }
