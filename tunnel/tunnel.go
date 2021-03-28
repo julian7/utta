@@ -1,38 +1,32 @@
 package tunnel
 
 import (
-	"crypto/tls"
-	"crypto/x509"
-	"io/ioutil"
-	"log"
+	"io"
 	"math/rand"
-	"net"
 	"time"
 
-	"github.com/julian7/utta/tunnel/connector"
-	"github.com/julian7/utta/tunnel/dialer"
-	"github.com/pkg/errors"
+	"github.com/go-kit/kit/log"
 )
 
-// Tunnel sets up the tunnel based on configuration settings
-func (config *Configuration) Tunnel() error {
-	conf, err := config.configureTunnel()
-	if err != nil {
-		log.Fatalf("cannot configure tunnel: %v", err)
-	}
+type Tunnel struct {
+	log.Logger
+	Listener
+}
 
-	ln, err := net.Listen("tcp", config.listenAddr)
+func NewTunnel(logger log.Logger, l Listener) *Tunnel {
+	return &Tunnel{
+		Logger:   logger,
+		Listener: l,
+	}
+}
+
+func (t *Tunnel) Run(cnx *Connection) error {
+	ln, err := t.Listen()
 	if err != nil {
-		log.Fatalf("cannot listen on port: %v", err)
+		_ = t.Log("level", "fatal", "msg", "cannot listen on port", "err", err)
+		return err
 	}
-	log.Printf("Tunnel listening on %s", config.listenAddr)
-	if len(config.listenCert) > 0 {
-		ln, err = tlsListener(ln, config.listenCert, config.listenKey, config.listenCA)
-		if err != nil {
-			log.Fatalf("cannot set up TLS on listening channel: %v", err)
-		}
-		log.Printf("TLS set up on listening channel")
-	}
+	_ = t.Log("msg", "Tunnel listening", "addr", t.Listener.Address())
 
 	defer ln.Close()
 
@@ -41,58 +35,15 @@ func (config *Configuration) Tunnel() error {
 	for {
 		conn, err := ln.Accept()
 		if err != nil {
-			log.Printf("Cannot listen: %v", err)
+			if err == io.EOF {
+				_ = t.Log("level", "warn", "msg", "connection closed")
+				break
+			}
+			_ = t.Log("level", "error", "msg", "error in listen", "err", err)
 			continue
 		}
-		go conf.handleConn(conn)
-	}
-}
-
-func tlsListener(l net.Listener, cert, key, ca string) (net.Listener, error) {
-	if key == "" {
-		key = cert
-	}
-	certbundle, err := tls.LoadX509KeyPair(cert, key)
-	if err != nil {
-		return nil, errors.Wrap(err, "cannot load cert keypair")
-	}
-	config := &tls.Config{Certificates: []tls.Certificate{certbundle}}
-
-	if ca != "" {
-		caFile, err := ioutil.ReadFile(ca)
-		if err != nil {
-			return nil, errors.Wrap(err, "cannot read CA file")
-		}
-		config.RootCAs = x509.NewCertPool()
-		config.ClientCAs.AppendCertsFromPEM(caFile)
-		config.ClientAuth = tls.RequireAndVerifyClientCert
-	}
-	config.BuildNameToCertificate()
-	return tls.NewListener(l, config), nil
-}
-
-func (config *Configuration) configureTunnel() (*connectionConfig, error) {
-	var err error
-	conf := &connectionConfig{config: config}
-
-	if config.tls {
-		conf.connect, err = connector.NewTLSConnector(config.serverName, config.connectCert, config.connectKey)
-	} else {
-		conf.connect, err = connector.NewTCPConnector()
-	}
-	if err != nil {
-		return nil, errors.Wrap(err, "cannot set up connector")
+		go cnx.handleConn(conn)
 	}
 
-	if len(config.sshTunnel) > 0 {
-		conf.sshtun, err = connector.NewSSHConnector(config.connectAddr, config.sshTunnel, config.sshUser, config.sshKey)
-		if err != nil {
-			return nil, errors.Wrap(err, "cannot set up SSH tunnel")
-		}
-		log.Printf("Setting up SSH tunnel to %s as %s using %s key", config.sshTunnel, config.sshUser, config.sshKey)
-	}
-
-	conf.dial = dialer.NewDialer(5*time.Second, config.proxy, config.connectAddr)
-
-	return conf, nil
+	return nil
 }
