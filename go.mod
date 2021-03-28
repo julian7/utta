@@ -3,7 +3,6 @@ module github.com/julian7/utta
 go 1.14
 
 require (
-	github.com/apex/log v1.9.0
 	github.com/go-kit/kit v0.10.0
 	github.com/pkg/errors v0.8.1
 	github.com/urfave/cli/v2 v2.3.0
