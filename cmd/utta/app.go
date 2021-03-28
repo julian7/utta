@@ -1,12 +1,17 @@
+//go:generate go run ../../internal/run/gen_versiontxt.go
+
 package main
 
 import (
+	_ "embed"
+
 	"github.com/go-kit/kit/log"
 	"github.com/julian7/utta/tunnel"
 	"github.com/urfave/cli/v2"
 )
 
-var version = "SNAPSHOT"
+//go:embed version.txt
+var version string
 
 type App struct {
 	logger log.Logger
