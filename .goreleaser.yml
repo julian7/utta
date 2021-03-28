@@ -1,0 +1,33 @@
+project_name: utta
+release:
+  github:
+    owner: julian7
+    name: utta
+before:
+  hooks:
+    - go mod tidy
+    - go generate ./...
+builds:
+- env:
+  - GO111MODULE=on
+  - CGO_ENABLED=0
+  main: ./cmd/utta
+  ldflags:
+  - -s -w
+  goos:
+  - darwin
+  - linux
+  - windows
+  goarch:
+  - amd64
+archives:
+- name_template: "{{.ProjectName}}-{{.Os}}-{{.Arch}}-{{.Version}}"
+  replacements:
+    darwin: macos
+  format: binary
+  files:
+  - none*
+checksum:
+  name_template: 'SHA256SUMS.{{.ProjectName}}-{{.Version}}'
+snapshot:
+  name_template: "{{ .Tag }}-{{ .ShortCommit }}"
