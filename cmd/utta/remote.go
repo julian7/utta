@@ -10,26 +10,30 @@ import (
 )
 
 func (a *App) remoteCommand() *cli.Command {
+	flags := a.CommonFlags()
+	flags = append(
+		flags,
+		&cli.StringFlag{
+			Name:     "sshlisten",
+			Value:    "",
+			Usage:    "SSH remote listening port",
+			Required: true,
+			EnvVars:  []string{"UTTA_SSH_LISTEN"},
+		},
+		&cli.StringFlag{
+			Name:     "sshconnect",
+			Value:    "",
+			Usage:    "SSH local target port",
+			Required: true,
+			EnvVars:  []string{"UTTA_SSH_CONNECT"},
+		},
+	)
+
 	return &cli.Command{
 		Name:   "remote",
 		Usage:  "create remotely listening tunnel",
 		Action: a.remoteAction,
-		Flags: []cli.Flag{
-			&cli.StringFlag{
-				Name:     "sshlisten",
-				Value:    "",
-				Usage:    "SSH remote listening port",
-				Required: true,
-				EnvVars:  []string{"UTTA_SSH_LISTEN"},
-			},
-			&cli.StringFlag{
-				Name:     "sshconnect",
-				Value:    "",
-				Usage:    "SSH local target port",
-				Required: true,
-				EnvVars:  []string{"UTTA_SSH_CONNECT"},
-			},
-		},
+		Flags:  flags,
 	}
 }
 
