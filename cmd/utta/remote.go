@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/julian7/utta/internal/remote"
 	"github.com/julian7/utta/tunnel"
 	"github.com/urfave/cli/v2"
-	"go.uber.org/zap"
 )
 
 func (a *App) remoteCommand() *cli.Command {
@@ -28,6 +28,18 @@ func (a *App) remoteCommand() *cli.Command {
 			Required: true,
 			EnvVars:  []string{"UTTA_SSH_CONNECT"},
 		},
+		&cli.UintFlag{
+			Name:    "breaker",
+			Value:   3,
+			Usage:   "Circuit breaker: taking a break after # attempts",
+			EnvVars: []string{"UTTA_BREAKER"},
+		},
+		&cli.DurationFlag{
+			Name:    "sleep",
+			Value:   30 * time.Minute,
+			Usage:   "Sleep between circuit breaks",
+			EnvVars: []string{"UTTA_SLEEP"},
+		},
 	)
 
 	return &cli.Command{
@@ -38,50 +50,28 @@ func (a *App) remoteCommand() *cli.Command {
 	}
 }
 
-func wait() {
-	time.Sleep(5 * time.Second)
-}
-
 func (a *App) remoteAction(c *cli.Context) error {
-	connection, err := a.GenericConnection(c)
+	conn, err := a.GenericConnection(c)
 	if err != nil {
 		return err
 	}
 
-	if !connection.HasSSH() {
+	if !conn.HasSSH() {
 		return errors.New("no ssh connection configured")
 	}
 
-	intConnection := tunnel.NewConnection(
+	tun := tunnel.NewConnection(
 		a.logger,
 		c.String("sshconnect"),
 		"",
 	)
-	if err := intConnection.SetupTCPConnector(); err != nil {
+	if err := tun.SetupTCPConnector(); err != nil {
 		return fmt.Errorf("setting up remote connector: %w", err)
 	}
 
-	for {
-		conn, err := connection.Dial()
-		if err != nil {
-			a.logger.Error("connection error", zap.Error(err))
-			wait()
-			continue
-		}
+	remote.New(conn, a.logger, c.String("sshlisten"), c.Uint("breaker"), c.Duration("sleep")).Loop(tun)
 
-		listener := tunnel.NewRemoteListener(
-			c.String("sshlisten"),
-			connection,
-		)
-
-		err = tunnel.NewTunnel(a.logger, listener).Run(intConnection)
-		if err != nil {
-			a.logger.Error("SSH tunnel error", zap.Error(err))
-			_ = conn.Close()
-			wait()
-			continue
-		}
-	}
+	return nil
 }
 
 func (a *App) remoteBefore(c *cli.Context) error {

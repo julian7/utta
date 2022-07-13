@@ -12,6 +12,8 @@ Changed:
 * update dependencies
 * switch to zap logger
 * add log level filter
+* remote: add circuit breaker to sleep for 30m (`--sleep`) after three (`--breaker`) consecutive
+  connections being closed in 30s
 
 ## [v0.1.0] - Mar 28, 2021
 
