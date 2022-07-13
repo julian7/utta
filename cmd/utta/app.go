@@ -4,25 +4,35 @@ package main
 
 import (
 	_ "embed"
+	"fmt"
 
-	"github.com/go-kit/log"
 	"github.com/julian7/utta/tunnel"
 	"github.com/urfave/cli/v2"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 //go:embed version.txt
 var version string
 
 type App struct {
-	logger log.Logger
+	logger *zap.Logger
+	level  *zap.AtomicLevel
 }
 
-func NewApp(l log.Logger) *App {
-	return &App{logger: l}
+func NewApp(l *zap.Logger, level *zap.AtomicLevel) *App {
+	return &App{logger: l, level: level}
 }
 
 func (a *App) CommonFlags() []cli.Flag {
 	return []cli.Flag{
+		&cli.StringFlag{
+			Name:    "log-level",
+			Aliases: []string{"l"},
+			Value:   "",
+			Usage:   "Log level (default: info; values: debug, info, warn, error, panic, fatal)",
+			EnvVars: []string{"UTTA_LOG_LEVEL"},
+		},
 		&cli.StringFlag{
 			Name:    "connect",
 			Value:   "",
@@ -82,11 +92,26 @@ func (a *App) Command() *cli.App {
 		Name:    "utta",
 		Usage:   "Universal Travel TCP Adapter",
 		Version: version,
+		Before:  a.setLogLevel,
 		Commands: []*cli.Command{
 			a.localCommand(),
 			a.remoteCommand(),
 		},
 	}
+}
+
+func (a *App) setLogLevel(c *cli.Context) error {
+	loglevel := c.String("log-level")
+	if len(loglevel) > 0 {
+		lvl, err := zapcore.ParseLevel(loglevel)
+		if err != nil {
+			return fmt.Errorf("parsing log-level: %w", err)
+		}
+
+		a.level.SetLevel(lvl)
+	}
+
+	return nil
 }
 
 func (a *App) GenericConnection(c *cli.Context) (*tunnel.Connection, error) {
@@ -121,8 +146,4 @@ func (a *App) GenericConnection(c *cli.Context) (*tunnel.Connection, error) {
 	}
 
 	return connection, nil
-}
-
-func (a *App) Log(data ...interface{}) error {
-	return log.With(a.logger, "caller", log.Caller(4)).Log(data...)
 }

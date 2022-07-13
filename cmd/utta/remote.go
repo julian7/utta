@@ -7,6 +7,7 @@ import (
 
 	"github.com/julian7/utta/tunnel"
 	"github.com/urfave/cli/v2"
+	"go.uber.org/zap"
 )
 
 func (a *App) remoteCommand() *cli.Command {
@@ -63,11 +64,7 @@ func (a *App) remoteAction(c *cli.Context) error {
 	for {
 		conn, err := connection.Dial()
 		if err != nil {
-			_ = a.logger.Log(
-				"level", "error",
-				"msg", "connection error",
-				"err", err,
-			)
+			a.logger.Error("connection error", zap.Error(err))
 			wait()
 			continue
 		}
@@ -79,11 +76,7 @@ func (a *App) remoteAction(c *cli.Context) error {
 
 		err = tunnel.NewTunnel(a.logger, listener).Run(intConnection)
 		if err != nil {
-			_ = a.logger.Log(
-				"level", "error",
-				"msg", "SSH tunnel error",
-				"err", err,
-			)
+			a.logger.Error("SSH tunnel error", zap.Error(err))
 			_ = conn.Close()
 			wait()
 			continue

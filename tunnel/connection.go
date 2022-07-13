@@ -7,21 +7,21 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-kit/log"
 	"github.com/julian7/utta/tunnel/connector"
 	"github.com/julian7/utta/tunnel/dialer"
 	"github.com/julian7/utta/uuid"
 	"github.com/pkg/errors"
+	"go.uber.org/zap"
 )
 
 type Connection struct {
-	log.Logger
+	*zap.Logger
 	dial    dialer.Dialer
 	connect connector.Connector
 	sshtun  *connector.SSHConnector
 }
 
-func NewConnection(logger log.Logger, addr, proxy string) *Connection {
+func NewConnection(logger *zap.Logger, addr, proxy string) *Connection {
 	return &Connection{
 		Logger: logger,
 		dial:   dialer.NewDialer(5*time.Second, proxy, addr),
@@ -74,47 +74,46 @@ func (cnx *Connection) handleConn(downstream net.Conn) {
 
 	uuID, err := uuid.New()
 	if err != nil {
-		cnx.Logger.Log(
-			"level", "error",
-			"msg", "cannot generate UUID for connection",
-			"connection", downstream.RemoteAddr().String(),
-			"err", err,
+		cnx.Logger.Error(
+			"cannot generate UUID for connection",
+			zap.String("connection", downstream.RemoteAddr().String()),
+			zap.Error(err),
 		)
 		return
 	}
 
-	connlog := log.With(cnx.Logger, "session", uuID.String())
+	connlog := cnx.Logger.With(zap.String("session", uuID.String()))
 
-	connlog.Log(
-		"msg", "Handling connection",
-		"remote", downstream.RemoteAddr().String(),
+	connlog.Info(
+		"Handling connection",
+		zap.String("remote", downstream.RemoteAddr().String()),
 	)
 
 	upstream, err := cnx.Dial()
 
 	if err != nil {
-		_ = connlog.Log("level", "error", "msg", "dial error", "err", err)
+		connlog.Error("dial error", zap.Error(err))
 
 		return
 	}
 
 	defer upstream.Close()
 
-	connlog.Log("msg", "connection established", "addr", upstream.RemoteAddr())
+	connlog.Info("connection established", zap.String("addr", upstream.RemoteAddr().String()))
 
 	done := make(chan bool)
 	if cnx.sshtun != nil {
-		connlog.Log(
-			"msg", "SSH connection established",
-			"addr", cnx.sshtun.Tunnel,
-			"through", cnx.sshtun.Addr,
+		connlog.Info(
+			"SSH connection established",
+			zap.String("addr", cnx.sshtun.Tunnel),
+			zap.String("through", cnx.sshtun.Addr),
 		)
 
 		go func(stream net.Conn, done <-chan bool) {
 			<-done
 			if stream != nil {
 				stream.Close()
-				connlog.Log("msg", "SSH connection closed")
+				connlog.Info("SSH connection closed")
 			}
 		}(cnx.sshtun.Connect, done)
 	}
@@ -147,7 +146,7 @@ func (cnx *Connection) Dial() (net.Conn, error) {
 	return upstream, nil
 }
 
-func datapipe(logger log.Logger, dst io.WriteCloser, src io.ReadCloser, direction string, done chan bool) {
+func datapipe(logger *zap.Logger, dst io.WriteCloser, src io.ReadCloser, direction string, done chan bool) {
 	var errstr string
 
 	b, err := io.Copy(io.Writer(dst), io.Reader(src))
@@ -160,10 +159,10 @@ func datapipe(logger log.Logger, dst io.WriteCloser, src io.ReadCloser, directio
 	if err != nil {
 		errstr = fmt.Sprintf(" Error: %v vs %v", err, io.EOF)
 	}
-	logger.Log(
-		"msg", "connection summary",
-		direction, b,
-		"err", errstr,
+	logger.Info(
+		"connection summary",
+		zap.Int64(direction, b),
+		zap.String("err", errstr),
 	)
 	done <- true
 }

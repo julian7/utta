@@ -7,7 +7,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
-No changes so far.
+Changed:
+
+* update dependencies
+* switch to zap logger
+* add log level filter
 
 ## [v0.1.0] - Mar 28, 2021
 

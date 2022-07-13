@@ -3,19 +3,22 @@ package main
 import (
 	"os"
 
-	"github.com/go-kit/log"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 func main() {
-	logger := log.With(
-		log.NewLogfmtLogger(os.Stderr),
-		"ts",
-		log.DefaultTimestampUTC,
-	)
+	logconf := zap.NewProductionConfig()
+	logconf.DisableStacktrace = true
+	logconf.Encoding = "console"
+	logconf.EncoderConfig.EncodeTime = zapcore.RFC3339TimeEncoder
+	logger, err := logconf.Build()
+	if err != nil {
+		panic(err)
+	}
 
-	app := NewApp(logger)
+	app := NewApp(logger, &logconf.Level)
 	if err := app.Command().Run(os.Args); err != nil {
-		_ = app.Log("error", err)
-		os.Exit(1)
+		app.logger.Error("runtime error", zap.Error(err))
 	}
 }
