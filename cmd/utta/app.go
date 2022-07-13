@@ -5,7 +5,7 @@ package main
 import (
 	_ "embed"
 
-	"github.com/go-kit/kit/log"
+	"github.com/go-kit/log"
 	"github.com/julian7/utta/tunnel"
 	"github.com/urfave/cli/v2"
 )

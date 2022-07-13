@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-kit/kit/log"
+	"github.com/go-kit/log"
 	"github.com/julian7/utta/tunnel/connector"
 	"github.com/julian7/utta/tunnel/dialer"
 	"github.com/julian7/utta/uuid"
