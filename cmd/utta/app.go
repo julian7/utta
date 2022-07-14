@@ -27,13 +27,6 @@ func NewApp(l *zap.Logger, level *zap.AtomicLevel) *App {
 func (a *App) CommonFlags() []cli.Flag {
 	return []cli.Flag{
 		&cli.StringFlag{
-			Name:    "log-level",
-			Aliases: []string{"l"},
-			Value:   "",
-			Usage:   "Log level (default: info; values: debug, info, warn, error, panic, fatal)",
-			EnvVars: []string{"UTTA_LOG_LEVEL"},
-		},
-		&cli.StringFlag{
 			Name:    "connect",
 			Value:   "",
 			Usage:   "Connect port",
@@ -93,6 +86,15 @@ func (a *App) Command() *cli.App {
 		Usage:   "Universal Travel TCP Adapter",
 		Version: version,
 		Before:  a.setLogLevel,
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:    "log-level",
+				Aliases: []string{"l"},
+				Value:   "",
+				Usage:   "Log level (default: info; values: debug, info, warn, error, panic, fatal)",
+				EnvVars: []string{"UTTA_LOG_LEVEL"},
+			},
+		},
 		Commands: []*cli.Command{
 			a.localCommand(),
 			a.remoteCommand(),
@@ -109,6 +111,7 @@ func (a *App) setLogLevel(c *cli.Context) error {
 		}
 
 		a.level.SetLevel(lvl)
+		a.logger.Debug("set log level", zap.String("loglevel", loglevel))
 	}
 
 	return nil
